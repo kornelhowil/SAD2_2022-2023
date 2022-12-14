@@ -9,31 +9,34 @@ class VAE(nn.Module):
         self.decoder = decoder
 
     @staticmethod
-    def sampling(mu, log_var):
-        std = torch.sqrt(torch.exp(log_var))
-        eps = torch.randn_like(std)
-        return eps * std + mu
+    def sampling(mu, var):
+        eps = torch.randn_like(var)
+        return eps * var + mu
 
     @staticmethod
     def kl_div(mu, sigma):
-        n = mu.shape[1]
-        mu = mu.reshape(mu.shape[0], mu.shape[1], 1)
-        tr_term = torch.sum(sigma, dim=1)
-        det_term = -torch.log(torch.prod(sigma, dim=1))
-        quad_term = torch.transpose(mu, 1, 2) @ mu
-        return torch.sum(0.5 * (tr_term + det_term + quad_term - n))
+        dist1 = torch.distributions.Normal(mu, sigma)
+        dist2 = torch.distributions.Normal(torch.zeros_like(mu), 1)
+        return torch.sum(torch.distributions.kl.kl_divergence(dist1, dist2))
 
     def loss_function(self, data, beta):
-        p, mu, log_var = self.forward(data)
-        kl_loss = self.kl_div(mu, torch.exp(log_var))
-        recon_loss = self.decoder.log_prob(torch.round(data), p)
-        return recon_loss + beta * kl_loss
-
-    def forward(self, x):
-        mu, log_var = self.encoder(x)
-        z = self.sampling(mu, log_var)
-        mu_d = self.decoder(z)
-        return mu_d, mu, log_var
+        p, mu, var = self.forward(data)
+        kl_loss = beta * self.kl_div(mu, var)
+        recon_loss = -self.decoder.log_prob(data, p)
+        return recon_loss + kl_loss, kl_loss, recon_loss
 
     def generate(self, z):
-        return self.decoder(z)
+        with torch.no_grad():
+            return self.decoder(z)
+
+    def calc_latent(self, x):
+        with torch.no_grad():
+            mu, var = self.encoder(x)
+            return self.sampling(mu, var)
+
+    def forward(self, x):
+        mu, var = self.encoder(x)
+        z = self.sampling(mu, var)
+        mu_d = self.decoder(z)
+        return mu_d, mu, var
+
