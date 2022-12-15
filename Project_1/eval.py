@@ -67,6 +67,9 @@ def second_histplot(train_adata):
 
 
 def plot_pca(pca_var, test_adata, name, hue):
+    f = plt.figure()
+    f.set_figwidth(6.4)
+    sns.set_theme()
     sns.scatterplot(x=pca_var[:, 0], y=pca_var[:, 1], hue=test_adata.obs[hue], legend=False)
     plt.xlabel('First PCA component')
     plt.ylabel('Second PCA component')
@@ -116,7 +119,7 @@ def plot_model(name, test_adata):
     plt.plot(combined_variance, label='Ratio of the explained variance')
     plt.legend()
     plt.savefig(f'Plots/{name}_PCA_components.pdf')
-
+    plt.clf()
     pca_var = pca.fit_transform(z.cpu())
     plot_pca(pca_var, test_adata, name, 'cell_type')
     plot_pca(pca_var, test_adata, name, 'batch')
